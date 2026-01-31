@@ -24,8 +24,13 @@ def featurize_data(
     data: List[DataPoint], feature_types: Set[str]
 ) -> List[DataPointWithFeatures]:
     """Add features to each datapoint based on feature types"""
-    # TODO: Implement this!
-    raise NotImplementedError
+    featurize = make_featurize(feature_types)
+    data_with_features = []
+    for dp in data:
+        features = featurize(dp.text)
+        dp_with_features = DataPointWithFeatures(id=dp.id, text=dp.text, label=dp.label, features=features)
+        data_with_features.append(dp_with_features)
+    return data_with_features
 
 
 class PerceptronModel:
@@ -50,7 +55,12 @@ class PerceptronModel:
             The output score.
         """
         # TODO: Implement this! Expected # of lines: <10
-        raise NotImplementedError
+        score = 0.0
+        for feature, value in datapoint.features.items():
+            weight_key = self._get_weight_key(feature, label)
+            score += self.weights[weight_key] * value
+        return score
+
 
     def predict(self, datapoint: DataPointWithFeatures) -> str:
         """Predicts a label for an input.
@@ -62,7 +72,14 @@ class PerceptronModel:
             The predicted class.
         """
         # TODO: Implement this! Expected # of lines: <5
-        raise NotImplementedError
+        best_label = None
+        best_score = float('-inf')
+        for label in self.labels:
+            score = self.score(datapoint, label)
+            if score > best_score:
+                best_score = score
+                best_label = label
+        return best_label
 
     def update_parameters(
         self, datapoint: DataPointWithFeatures, prediction: str, lr: float
@@ -75,7 +92,10 @@ class PerceptronModel:
             lr: Learning rate.
         """
         # TODO: Implement this! Expected # of lines: <10
-        raise NotImplementedError
+        if prediction != datapoint.label:
+            for feature, value in datapoint.features.items():
+                self.weights[self._get_weight_key(feature, prediction)] -= lr * value
+                self.weights[self._get_weight_key(feature, datapoint.label)] += lr * value
 
     def train(
         self,
@@ -95,7 +115,16 @@ class PerceptronModel:
             lr: Learning rate.
         """
         # TODO: Implement this!
-        raise NotImplementedError
+        for dp in training_data:
+            if dp.label is not None:
+                self.labels.add(dp.label)
+        for epoch in range(num_epochs):
+            for datapoint in tqdm(training_data, desc=f"Epoch {epoch+1}/{num_epochs}"):
+                prediction = self.predict(datapoint)
+                self.update_parameters(datapoint, prediction, lr)
+            val_acc = self.evaluate(val_data)
+        print("Training complete.")
+
 
     def save_weights(self, path: str) -> None:
         with open(path, "w") as f:
@@ -117,7 +146,18 @@ class PerceptronModel:
             accuracy (float): The accuracy of the model on the data.
         """
         # TODO: Implement this!
-        raise NotImplementedError
+        predictions = []
+        for dp in data:
+            predictions.append(self.predict(dp))
+
+        if save_path is not None:
+            save_results(data, predictions, save_path)
+
+        targets = [d.label for d in data if d.label is not None]
+        if len(targets) == 0:
+            return 0.0
+
+        return accuracy(predictions[:len(targets)], targets)
 
 
 if __name__ == "__main__":
