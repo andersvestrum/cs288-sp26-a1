@@ -189,7 +189,7 @@ if __name__ == "__main__":
         "-d",
         "--data",
         type=str,
-        default="newsgroups",
+        default="sst2",
         help="Data source, one of ('sst2', 'newsgroups')",
     )
     parser.add_argument(
@@ -200,21 +200,15 @@ if __name__ == "__main__":
         help="Feature type, e.g., bow+len",
     )
     parser.add_argument(
-        "-e", "--epochs", type=int, default=10, help="Number of epochs"
+        "-e", "--epochs", type=int, default=50, help="Number of epochs"
     )
     parser.add_argument(
         "-l", "--learning_rate", type=float, default=0.1, help="Learning rate"
     )
-    parser.add_argument(
-        "--seed",
-        type=int,
-        default=0,
-        help="Random seed for reproducibility",
-    )
     args = parser.parse_args()
 
-    # set random seeds for reproducibility
-    seed = args.seed
+    # hardcoded seed for reproducibility
+    seed = 42
     os.environ.setdefault("PYTHONHASHSEED", str(seed))
     random.seed(seed)
     np.random.seed(seed)
