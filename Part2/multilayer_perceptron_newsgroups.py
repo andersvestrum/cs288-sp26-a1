@@ -61,10 +61,7 @@ class Tokenizer:
     def tokenize(self, text: str) -> List[int]:
         # TODO: Implement this! Expected # of lines: 5~10
         tokens = self._pre_process_text(text)
-        token_ids = []
-        for tok in tokens:
-            token_ids.append(self.token2id.get(tok, Tokenizer.TOK_UNK_INDEX))
-        return token_ids
+        return [self.token2id.get(tok, Tokenizer.TOK_PADDING_INDEX) for tok in tokens]
 
 
 def get_label_mappings(
@@ -141,9 +138,9 @@ class MultilayerPerceptronModel(nn.Module):
         self.padding_index = padding_index
         # TODO: Implement this!
         emb_dim = 128
-        hidden_dims = [128, 64, 128]
+        hidden_dims = [128, 256, 256, 128]
         activation = "relu"
-        dropout_p = 0.15
+        dropout_p = 0.3
 
         self.embedding = nn.Embedding(
             num_embeddings=vocab_size,
@@ -160,7 +157,8 @@ class MultilayerPerceptronModel(nn.Module):
         self.fc1 = nn.Linear(emb_dim, hidden_dims[0])
         self.fc2 = nn.Linear(hidden_dims[0], hidden_dims[1])
         self.fc3 = nn.Linear(hidden_dims[1], hidden_dims[2])
-        self.fc_out = nn.Linear(hidden_dims[2], num_classes)
+        self.fc4 = nn.Linear(hidden_dims[2], hidden_dims[3])
+        self.fc_out = nn.Linear(hidden_dims[3], num_classes)
 
         self.activation = activation_fn[activation]
         self.dropout = nn.Dropout(dropout_p)
@@ -182,12 +180,13 @@ class MultilayerPerceptronModel(nn.Module):
             output_b_c: The output of the model.
         """
         # TODO: Implement this!
-        embedded_b_l_e = self.embedding(input_features_b_l)
-        mask_b_l = (input_features_b_l != self.padding_index).float()
-        embedded_b_l_e = embedded_b_l_e * mask_b_l.unsqueeze(-1)
-        sum_b_e = embedded_b_l_e.sum(dim=1)
-        denom_b = mask_b_l.sum(dim=1).clamp(min=1.0)
-        bow_b_e = sum_b_e / denom_b.unsqueeze(-1)
+        embedded_b_l_e = self.embedding(input_features_b_l)  # (b, l, e)
+        mask_b_l = (input_features_b_l != self.padding_index).float()  # (b, l)
+        mask_b_l_1 = mask_b_l.unsqueeze(-1)  # (b, l, 1)
+
+        summed_b_e = (embedded_b_l_e * mask_b_l_1).sum(dim=1)  # (b, e)
+        lengths_b_1 = mask_b_l.sum(dim=1).clamp(min=1).unsqueeze(-1)  # (b, 1)
+        bow_b_e = summed_b_e / lengths_b_1  # (b, e)
 
         hidden_1 = self.fc1(bow_b_e)
         hidden_1 = self.activation(hidden_1)
@@ -198,7 +197,10 @@ class MultilayerPerceptronModel(nn.Module):
         hidden_3 = self.fc3(hidden_2)
         hidden_3 = self.activation(hidden_3)
         hidden_3 = self.dropout(hidden_3)
-        output_b_c = self.fc_out(hidden_3)
+        hidden_4 = self.fc4(hidden_3)
+        hidden_4 = self.activation(hidden_4)
+        hidden_4 = self.dropout(hidden_4)
+        output_b_c = self.fc_out(hidden_4)
         return output_b_c
 
 
@@ -295,7 +297,7 @@ class Trainer:
             total_loss = 0.0
             total_examples = 0
             loss_fn = nn.CrossEntropyLoss()
-            dataloader = DataLoader(training_data, batch_size=32, shuffle=True)
+            dataloader = DataLoader(training_data, batch_size=64, shuffle=True)
             for inputs_b_l, lengths_b, labels_b in tqdm(dataloader):
                 # TODO: Implement this!
                 inputs_b_l = inputs_b_l.to(device)
@@ -333,7 +335,7 @@ if __name__ == "__main__":
         help="Data source, one of ('sst2', 'newsgroups')",
     )
     parser.add_argument(
-        "-e", "--epochs", type=int, default=20, help="Number of epochs"
+        "-e", "--epochs", type=int, default=50, help="Number of epochs"
     )
     parser.add_argument(
         "-l", "--learning_rate", type=float, default=0.005, help="Learning rate"
@@ -366,7 +368,7 @@ if __name__ == "__main__":
     trainer = Trainer(model)
 
     print("Training the model...")
-    optimizer = torch.optim.Adam(model.parameters(), lr=lr)
+    optimizer = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=1e-2)
     trainer.train(train_ds, val_ds, optimizer, num_epochs)
 
     # Evaluate on dev

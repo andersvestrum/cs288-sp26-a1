@@ -38,7 +38,6 @@ class Tokenizer:
     # The index of the padding embedding.
     # This is used to pad variable length sequences.
     TOK_PADDING_INDEX = 0
-    TOK_UNK_INDEX = 1
     STOP_WORDS = set(pd.read_csv("stopwords.txt", header=None)[0])
 
     def _pre_process_text(self, text: str) -> List[str]:
@@ -60,11 +59,7 @@ class Tokenizer:
     def tokenize(self, text: str) -> List[int]:
         # TODO: Implement this! Expected # of lines: 5~10
         tokens = self._pre_process_text(text)
-        token_ids = []
-        for tok in tokens:
-            token_ids.append(self.token2id.get(tok, Tokenizer.TOK_UNK_INDEX))
-        return token_ids
-
+        return [self.token2id.get(tok, Tokenizer.TOK_PADDING_INDEX) for tok in tokens]
 
 def get_label_mappings(
     data: List[DataPoint],
@@ -140,9 +135,9 @@ class MultilayerPerceptronModel(nn.Module):
         self.padding_index = padding_index
         # TODO: Implement this!
         emb_dim = 128
-        hidden_dims = [128, 64]
+        hidden_dims = [128]
         activation = "relu"
-        dropout_p = 0.3
+        dropout_p = 0.2
 
         self.embedding = nn.Embedding(
             num_embeddings=vocab_size,
@@ -157,8 +152,7 @@ class MultilayerPerceptronModel(nn.Module):
         }
 
         self.fc1 = nn.Linear(emb_dim, hidden_dims[0])
-        self.fc2 = nn.Linear(hidden_dims[0], hidden_dims[1])
-        self.fc_out = nn.Linear(hidden_dims[1], num_classes)
+        self.fc_out = nn.Linear(hidden_dims[0], num_classes)
 
         self.activation = activation_fn[activation]
         self.dropout = nn.Dropout(dropout_p)
@@ -190,10 +184,7 @@ class MultilayerPerceptronModel(nn.Module):
         hidden_1 = self.fc1(bow_b_e)
         hidden_1 = self.activation(hidden_1)
         hidden_1 = self.dropout(hidden_1)
-        hidden_2 = self.fc2(hidden_1)
-        hidden_2 = self.activation(hidden_2)
-        hidden_2 = self.dropout(hidden_2)
-        output_b_c = self.fc_out(hidden_2)
+        output_b_c = self.fc_out(hidden_1)
         return output_b_c
 
 
@@ -290,7 +281,7 @@ class Trainer:
             total_loss = 0.0
             total_examples = 0
             loss_fn = nn.CrossEntropyLoss()
-            dataloader = DataLoader(training_data, batch_size=32, shuffle=True)
+            dataloader = DataLoader(training_data, batch_size=64, shuffle=True)
             for inputs_b_l, lengths_b, labels_b in tqdm(dataloader):
                 # TODO: Implement this!
                 inputs_b_l = inputs_b_l.to(device)
@@ -328,10 +319,10 @@ if __name__ == "__main__":
         help="Data source, one of ('sst2', 'newsgroups')",
     )
     parser.add_argument(
-        "-e", "--epochs", type=int, default=10, help="Number of epochs"
+        "-e", "--epochs", type=int, default=30, help="Number of epochs"
     )
     parser.add_argument(
-        "-l", "--learning_rate", type=float, default=0.005, help="Learning rate"
+        "-l", "--learning_rate", type=float, default=0.0005, help="Learning rate"
     )
     args = parser.parse_args()
 
@@ -361,7 +352,7 @@ if __name__ == "__main__":
     trainer = Trainer(model)
 
     print("Training the model...")
-    optimizer = torch.optim.Adam(model.parameters(), lr=lr)
+    optimizer = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=1e-2)
     trainer.train(train_ds, val_ds, optimizer, num_epochs)
 
     # Evaluate on dev
