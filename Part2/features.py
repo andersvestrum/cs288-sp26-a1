@@ -1,4 +1,5 @@
 from collections import ChainMap
+from pathlib import Path
 import string
 from typing import Callable, Dict, List, Set
 
@@ -23,7 +24,7 @@ class FeatureMap:
 
 class BagOfWords(FeatureMap):
     name = "bow"
-    STOP_WORDS = set(pd.read_csv("stopwords.txt", header=None)[0])
+    STOP_WORDS = set(pd.read_csv(Path(__file__).resolve().parent / "stopwords.txt", header=None)[0])
 
     @classmethod
     def featurize(self, text: str) -> Dict[str, float]:

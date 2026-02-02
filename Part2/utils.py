@@ -28,6 +28,7 @@ def read_labeled_data(
     # TODO: implement this! Expected # of lines: <10
     df_data = pd.read_csv(data_filename)
     df_labels = pd.read_csv(labels_filename)
+    df_labels["label"] = df_labels["label"].astype(str)
     data_points = []
     for _, row in df_data.iterrows():
         id_ = row["id"]

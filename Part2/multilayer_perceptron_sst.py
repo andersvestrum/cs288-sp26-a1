@@ -25,7 +25,6 @@ import os
 from collections import Counter
 from pprint import pprint
 from typing import Dict, List, Tuple
-from pathlib import Path
 
 import pandas as pd
 import torch
@@ -40,12 +39,12 @@ class Tokenizer:
     # This is used to pad variable length sequences.
     TOK_PADDING_INDEX = 0
     TOK_UNK_INDEX = 1
-    STOP_WORDS = set(pd.read_csv(Path(__file__).resolve().parent / "stopwords.txt", header=None)[0])
+    STOP_WORDS = set(pd.read_csv("stopwords.txt", header=None)[0])
+
     def _pre_process_text(self, text: str) -> List[str]:
         # TODO: Implement this! Expected # of lines: 5~10
         text = text.lower()
         tokens = text.split()
-        tokens = [t for t in tokens if t not in Tokenizer.STOP_WORDS]
         return tokens
 
     def __init__(self, data: List[DataPoint], max_vocab_size: int = None):
@@ -53,7 +52,7 @@ class Tokenizer:
         token_freq = Counter(self._pre_process_text(corpus))
         token_freq = token_freq.most_common(max_vocab_size)
         tokens = [t for t, _ in token_freq]
-
+        
         self.token2id = {t: (i + 1) for i, t in enumerate(tokens)}
         self.token2id["<PAD>"] = Tokenizer.TOK_PADDING_INDEX
         self.id2token = {i: t for t, i in self.token2id.items()}
@@ -141,9 +140,9 @@ class MultilayerPerceptronModel(nn.Module):
         self.padding_index = padding_index
         # TODO: Implement this!
         emb_dim = 128
-        hidden_dims = [128, 64, 128]
+        hidden_dims = [128, 64]
         activation = "relu"
-        dropout_p = 0.15
+        dropout_p = 0.3
 
         self.embedding = nn.Embedding(
             num_embeddings=vocab_size,
@@ -159,8 +158,7 @@ class MultilayerPerceptronModel(nn.Module):
 
         self.fc1 = nn.Linear(emb_dim, hidden_dims[0])
         self.fc2 = nn.Linear(hidden_dims[0], hidden_dims[1])
-        self.fc3 = nn.Linear(hidden_dims[1], hidden_dims[2])
-        self.fc_out = nn.Linear(hidden_dims[2], num_classes)
+        self.fc_out = nn.Linear(hidden_dims[1], num_classes)
 
         self.activation = activation_fn[activation]
         self.dropout = nn.Dropout(dropout_p)
@@ -195,10 +193,7 @@ class MultilayerPerceptronModel(nn.Module):
         hidden_2 = self.fc2(hidden_1)
         hidden_2 = self.activation(hidden_2)
         hidden_2 = self.dropout(hidden_2)
-        hidden_3 = self.fc3(hidden_2)
-        hidden_3 = self.activation(hidden_3)
-        hidden_3 = self.dropout(hidden_3)
-        output_b_c = self.fc_out(hidden_3)
+        output_b_c = self.fc_out(hidden_2)
         return output_b_c
 
 
@@ -329,11 +324,11 @@ if __name__ == "__main__":
         "-d",
         "--data",
         type=str,
-        default="newsgroups",
+        default="sst2",
         help="Data source, one of ('sst2', 'newsgroups')",
     )
     parser.add_argument(
-        "-e", "--epochs", type=int, default=20, help="Number of epochs"
+        "-e", "--epochs", type=int, default=10, help="Number of epochs"
     )
     parser.add_argument(
         "-l", "--learning_rate", type=float, default=0.005, help="Learning rate"
